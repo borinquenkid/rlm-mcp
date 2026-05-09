@@ -11,7 +11,6 @@ mod tests {
 }
 
 use std::process::Command;
-use std::path::Path;
 
 pub struct PythonManager {}
 

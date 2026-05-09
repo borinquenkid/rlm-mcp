@@ -66,6 +66,19 @@ impl ServerHandler for RlmHandler {
                 meta: None,
                 output_schema: None,
                 title: Some("RLM Completion".to_string()),
+            }, Tool {
+                name: "system_status".to_string(),
+                description: Some("Check the current hardware and system status.".to_string()),
+                input_schema: serde_json::from_value(json!({
+                    "type": "object",
+                    "properties": {}
+                })).unwrap(),
+                annotations: None,
+                execution: None,
+                icons: vec![],
+                meta: None,
+                output_schema: None,
+                title: Some("System Status".to_string()),
             }],
         })
     }
@@ -75,6 +88,22 @@ impl ServerHandler for RlmHandler {
         params: CallToolRequestParams,
         _runtime: Arc<dyn McpServer>,
     ) -> Result<CallToolResult, CallToolError> {
+        if params.name == "system_status" {
+            let detector = SystemDetector::new();
+            let status_text = format!(
+                "OS: {}\nArch: {}\nTotal Memory: {:.2} GB",
+                detector.platform(),
+                detector.arch(),
+                detector.total_memory_gb()
+            );
+            return Ok(CallToolResult {
+                content: vec![ContentBlock::TextContent(TextContent::new(status_text, None, None))],
+                is_error: None,
+                meta: None,
+                structured_content: None,
+            });
+        }
+
         if params.name != "rlm_completion" {
             return Err(CallToolError::new(RpcError::method_not_found()));
         }

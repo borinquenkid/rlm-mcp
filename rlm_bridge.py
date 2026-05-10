@@ -37,28 +37,34 @@ def transform_paths(obj, root_path, to_relative=True):
         return [transform_paths(i, root_path, to_relative) for i in obj]
     return obj
 
+import yaml
+
+APACHE_HEADER = """# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements; and to You under the Apache License, Version 2.0.
+# --- RLM Generated Knowledge Base ---
+"""
+
 def save_state(project_id, state_data, workspace_root=None):
-    """Saves the distilled reasoning state to disk with relative paths."""
+    """Saves the distilled reasoning state to disk as YAML with Apache header."""
     base_dir = workspace_root if workspace_root else "."
-    path = os.path.join(base_dir, ".mcp", "knowledge_base", f"{project_id}.json")
+    path = os.path.join(base_dir, ".mcp", "knowledge_base", f"{project_id}.yaml")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     
-    # Normalize paths relative to workspace_root
     root_path = workspace_root if workspace_root else os.getcwd()
     normalized_data = transform_paths(state_data, root_path, to_relative=True)
     
     with open(path, "w") as f:
-        json.dump(normalized_data, f, indent=2)
+        f.write(APACHE_HEADER)
+        yaml.dump(normalized_data, f, sort_keys=False, default_flow_style=False)
     logger.info(f"💾 State saved and normalized to [bold blue]{path}[/]")
 
 def load_state(project_id, workspace_root=None):
-    """Loads previous reasoning state and expands relative paths."""
+    """Loads previous reasoning state from YAML and expands relative paths."""
     base_dir = workspace_root if workspace_root else "."
-    path = os.path.join(base_dir, ".mcp", "knowledge_base", f"{project_id}.json")
+    path = os.path.join(base_dir, ".mcp", "knowledge_base", f"{project_id}.yaml")
     if os.path.exists(path):
         with open(path, "r") as f:
-            data = json.load(f)
-            # Expand paths after loading
+            data = yaml.safe_load(f)
             root_path = workspace_root if workspace_root else os.getcwd()
             return transform_paths(data, root_path, to_relative=False)
     return {}

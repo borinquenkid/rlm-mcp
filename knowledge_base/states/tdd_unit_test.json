@@ -1,0 +1,10 @@
+{
+  "project_root": ".",
+  "source_files": [
+    "src/main.rs",
+    "/absolute/path/outside/project"
+  ],
+  "nested": {
+    "path": "."
+  }
+}

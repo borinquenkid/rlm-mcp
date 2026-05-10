@@ -20,20 +20,45 @@ logging.basicConfig(
 logger = logging.getLogger("rlm_bridge")
 logger.setLevel(logging.DEBUG)
 
+def transform_paths(obj, root_path, to_relative=True):
+    """Recursively transforms absolute paths to relative or vice versa."""
+    if isinstance(obj, str):
+        if to_relative:
+            if obj.startswith(root_path):
+                return os.path.relpath(obj, root_path)
+        else:
+            # Check if it's a relative path (not starting with / or C:\)
+            if not os.path.isabs(obj) and (obj.startswith("./") or obj.startswith("../") or "/" in obj or "\\" in obj):
+                return os.path.abspath(os.path.join(root_path, obj))
+        return obj
+    elif isinstance(obj, dict):
+        return {k: transform_paths(v, root_path, to_relative) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [transform_paths(i, root_path, to_relative) for i in obj]
+    return obj
+
 def save_state(project_id, state_data):
-    """Saves the distilled reasoning state to disk."""
+    """Saves the distilled reasoning state to disk with relative paths."""
     path = f"knowledge_base/states/{project_id}.json"
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    
+    # Normalize paths before saving
+    root_path = os.getcwd()
+    normalized_data = transform_paths(state_data, root_path, to_relative=True)
+    
     with open(path, "w") as f:
-        json.dump(state_data, f, indent=2)
-    logger.info(f"💾 State saved for [bold green]{project_id}[/]")
+        json.dump(normalized_data, f, indent=2)
+    logger.info(f"💾 State saved and normalized for [bold green]{project_id}[/]")
 
 def load_state(project_id):
-    """Loads the previous reasoning state."""
+    """Loads previous reasoning state and expands relative paths."""
     path = f"knowledge_base/states/{project_id}.json"
     if os.path.exists(path):
         with open(path, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+            # Expand paths after loading
+            root_path = os.getcwd()
+            return transform_paths(data, root_path, to_relative=False)
     return {}
 
 def run_rlm(prompt, model_name, base_url, environment="local", project_id=None):

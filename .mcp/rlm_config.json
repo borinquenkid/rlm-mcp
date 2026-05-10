@@ -2,7 +2,7 @@
   "sub_servers": {
     "codebase": {
       "command": "mcp-codebase-memory",
-      "args": ["--project", "grails-core"]
+      "args": ["--project", "$PROJECT_NAME"]
     }
   }
 }

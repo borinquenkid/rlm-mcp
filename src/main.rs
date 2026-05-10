@@ -47,11 +47,20 @@ impl SubMcpOrchestrator {
             return Some(Self { config });
         }
         None
+    pub fn start_sub_servers(&self, workspace_root: &Path) {
+        let project_name = workspace_root.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown-project");
+
+        for (name, sub) in &self.config.sub_servers {
+            let args: Vec<String> = sub.args.iter()
+                .map(|a| a.replace("$PROJECT_NAME", project_name))
+                .collect();
+
+            println!("🚀 Starting sub-server: {} ({} {})", name, sub.command, args.join(" "));
+        }
     }
 
-    pub fn start_sub_servers(&self) {
-        for (name, sub) in &self.config.sub_servers {
-            println!("🚀 Starting sub-server: {} ({} {})", name, sub.command, sub.args.join(" "));
             // In a full implementation, we would use rust-mcp-sdk's client here
             // to connect and discover tools. For now, we log the intent.
         }
@@ -314,7 +323,7 @@ async fn main() -> SdkResult<()> {
 
     // 0. Load Sub-MCPs (Inception)
     if let Some(orchestrator) = SubMcpOrchestrator::load(&workspace_root) {
-        orchestrator.start_sub_servers();
+        orchestrator.start_sub_servers(&workspace_root);
     }
 
     // 1. Detect Hardware & OS

@@ -25,8 +25,32 @@
 - `knowledge_base/`: Distilled "permanent facts" about your project (version-controlled).
 - `trajectories/`: Raw logs of every "thinking" session (ignored by Git).
 
-## Documentation & Roadmap
-See [PLAN.md](./PLAN.md) for the full "Project Brain" architecture roadmap.
+## Multi-Agent Configuration
+`rlm-mcp` is designed to orchestrate multiple specialized AI tools. You can "inject" sub-MCP servers into the Master Brain by adding them to `.mcp/rlm_config.json`:
 
-## License
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+```json
+{
+  "sub_servers": {
+    "git": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-git", "--repository", "."]
+    }
+  }
+}
+```
+
+Once defined, `rlm-mcp` will automatically discover these tools, making them available to your recursive reasoning engine (e.g., `mcp.git.get_diff()`).
+
+## Usage with MCP Clients
+To use `rlm-mcp` in your IDE (like Claude Desktop), add this to your MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "rlm-mcp": {
+      "command": "/path/to/rlm-mcp"
+    }
+  }
+}
+```
+`rlm-mcp` will then auto-provision the local Ollama backend and Python environment on its first launch.

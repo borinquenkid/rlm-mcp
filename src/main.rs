@@ -5,7 +5,6 @@ mod python;
 use crate::system::SystemDetector;
 use crate::ollama::OllamaManager;
 use crate::python::PythonManager;
-
 use async_trait::async_trait;
 use rust_mcp_schema::{
     CallToolRequestParams, CallToolResult, ListToolsResult, PaginatedRequestParams,
@@ -15,9 +14,10 @@ use rust_mcp_schema::{
 use rust_mcp_sdk::{
     error::SdkResult,
     mcp_server::{server_runtime, McpServerOptions, ServerHandler, ServerRuntime},
-    schema::schema_utils::CallToolError,
+    schema::CallToolError,
     McpServer, StdioTransport, ToMcpServerHandler, TransportOptions,
 };
+
 use serde_json::json;
 use std::process::{Command, Stdio};
 use std::io::Write;

@@ -1,8 +1,8 @@
 {
   "sub_servers": {
-    "system_inspector": {
-      "command": "python",
-      "args": ["-c", "print('Fake MCP Server Output')"]
+    "codebase": {
+      "command": "mcp-codebase-memory",
+      "args": ["--project", "grails-core"]
     }
   }
 }

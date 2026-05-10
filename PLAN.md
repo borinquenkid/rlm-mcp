@@ -20,15 +20,14 @@ The system is a fully autonomous orchestrator.
 - [x] **Distribution:** Multi-platform CI/CD via `cargo-dist` & GitHub Actions.
 - [x] **Self-Maintenance:** `self_update` tool for autonomous maintenance.
 
-### Future/Planned Enhancements
-- [ ] **Task 4.1: Sub-MCP Client Logic (Inception)**
-    - Implement a Rust client to connect to external MCP servers (stdio/SSE).
-- [ ] **Task 4.2: Tool Proxying**
-    - Dynamically inject Sub-MCP tool definitions into the Python RLM sandbox.
-- [ ] **Task 4.3: Recursive Tool Delegation**
-    - Allow RLM to call Sub-MCP tools and verify their outputs before finalizing answers.
-- [ ] **Task 5.3: Sandbox Security (E2B/Docker)**
-    - Add support for containerized code execution for safer RLM tool use.
+### Phase 7: Sub-MCP Integration (Core)
+- [ ] **Task 7.1: Hybrid Server/Client Orchestration**
+    - Update `src/main.rs` to maintain active `Client` connections to Sub-MCPs.
+    - Implement tool-routing to map `codebase:*` requests to the child MCP.
+- [ ] **Task 7.2: Discovery & Injection**
+    - Automatically fetch tools from `codebase-memory` and inject into RLM bridge.
+- [ ] **Task 7.3: Proxy & Distill**
+    - Proxy graph queries and distill the results using the lightweight reasoning engine.
 
 ## Technical Debt & Considerations
 - **Memory Pressure:** The current model footprint (7B) is tuned for 16GB total RAM machines.

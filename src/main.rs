@@ -32,12 +32,16 @@ impl ServerHandler for RlmHandler {
         _params: Option<PaginatedRequestParams>,
         _runtime: Arc<dyn McpServer>,
     ) -> Result<ListToolsResult, RpcError> {
-        let input_schema: ToolInputSchema = serde_json::from_value(json!({
+        let completion_schema: ToolInputSchema = serde_json::from_value(json!({
             "type": "object",
             "properties": {
                 "prompt": {
                     "type": "string",
                     "description": "The prompt to process recursively."
+                },
+                "project_id": {
+                    "type": "string",
+                    "description": "Optional project identifier for persistent reasoning memory."
                 },
                 "model_name": {
                     "type": "string",
@@ -53,19 +57,44 @@ impl ServerHandler for RlmHandler {
             "required": ["prompt"]
         })).map_err(|e| RpcError::internal_error().with_message(format!("Failed to parse schema: {}", e)))?;
 
+        let sync_schema: ToolInputSchema = serde_json::from_value(json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path to the local repository root to synchronize."
+                },
+                "project_id": {
+                    "type": "string",
+                    "description": "Project identifier for this repository."
+                }
+            },
+            "required": ["path", "project_id"]
+        })).map_err(|e| RpcError::internal_error().with_message(format!("Failed to parse schema: {}", e)))?;
+
         Ok(ListToolsResult {
             meta: None,
             next_cursor: None,
             tools: vec![Tool {
                 name: "rlm_completion".to_string(),
-                description: Some("Perform a recursive language model completion using RLM and a local LLM.".to_string()),
-                input_schema,
+                description: Some("Perform a recursive language model completion using RLM with persistence.".to_string()),
+                input_schema: completion_schema,
                 annotations: None,
                 execution: None,
                 icons: vec![],
                 meta: None,
                 output_schema: None,
                 title: Some("RLM Completion".to_string()),
+            }, Tool {
+                name: "sync_codebase".to_string(),
+                description: Some("Incrementally synchronize RLM's understanding with local code changes.".to_string()),
+                input_schema: sync_schema,
+                annotations: None,
+                execution: None,
+                icons: vec![],
+                meta: None,
+                output_schema: None,
+                title: Some("Sync Codebase".to_string()),
             }, Tool {
                 name: "system_status".to_string(),
                 description: Some("Check the current hardware and system status.".to_string()),
@@ -104,15 +133,40 @@ impl ServerHandler for RlmHandler {
             });
         }
 
+        if params.name == "sync_codebase" {
+            let args = params.arguments.unwrap_or_default();
+            let path = args.get("path").and_then(|v| v.as_str()).ok_or_else(|| CallToolError::new(RpcError::invalid_params()))?;
+            let project_id = args.get("project_id").and_then(|v| v.as_str()).ok_or_else(|| CallToolError::new(RpcError::invalid_params()))?;
+            
+            // 1. Calculate diffs (simple version: list files)
+            // In a real production tool, we'd use the sha2 crate here to compare hashes.
+            // For now, we'll prompt RLM to perform the scan.
+            let sync_prompt = format!(
+                "Scan the repository at {} and update your consolidated knowledge base for project '{}'. 
+                Focus on identifying architectural changes and new classes.", 
+                path, project_id
+            );
+
+            // 2. Call completion with the sync prompt
+            return self.call_bridge(&sync_prompt, "deepseek-r1:7b", "local", Some(project_id)).await;
+        }
+
         if params.name != "rlm_completion" {
             return Err(CallToolError::new(RpcError::method_not_found()));
         }
 
         let args = params.arguments.unwrap_or_default();
         let prompt = args.get("prompt").and_then(|v| v.as_str()).ok_or_else(|| CallToolError::new(RpcError::invalid_params()))?;
+        let project_id = args.get("project_id").and_then(|v| v.as_str());
         let model_name = args.get("model_name").and_then(|v| v.as_str()).unwrap_or("deepseek-r1:7b");
         let environment = args.get("environment").and_then(|v| v.as_str()).unwrap_or("local");
 
+        self.call_bridge(prompt, model_name, environment, project_id).await
+    }
+}
+
+impl RlmHandler {
+    async fn call_bridge(&self, prompt: &str, model_name: &str, environment: &str, project_id: Option<&str>) -> Result<CallToolResult, CallToolError> {
         // Call the Python bridge
         let mut child = Command::new("uv")
             .arg("run")
@@ -128,7 +182,8 @@ impl ServerHandler for RlmHandler {
             "prompt": prompt,
             "model_name": model_name,
             "base_url": "http://localhost:11434/v1",
-            "environment": environment
+            "environment": environment,
+            "project_id": project_id
         });
 
         if let Some(mut stdin) = child.stdin.take() {

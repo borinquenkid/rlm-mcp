@@ -2,6 +2,7 @@
 name = "rlm-mcp"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/borinquenkid/rlm-mcp"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -14,3 +15,8 @@ async-trait = "0.1"
 sysinfo = "0.33"
 walkdir = "2.5"
 sha2 = "0.10"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

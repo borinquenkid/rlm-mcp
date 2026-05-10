@@ -37,39 +37,41 @@ def transform_paths(obj, root_path, to_relative=True):
         return [transform_paths(i, root_path, to_relative) for i in obj]
     return obj
 
-def save_state(project_id, state_data):
+def save_state(project_id, state_data, workspace_root=None):
     """Saves the distilled reasoning state to disk with relative paths."""
-    path = f"knowledge_base/states/{project_id}.json"
+    base_dir = workspace_root if workspace_root else "."
+    path = os.path.join(base_dir, ".mcp", "knowledge_base", f"{project_id}.json")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     
-    # Normalize paths before saving
-    root_path = os.getcwd()
+    # Normalize paths relative to workspace_root
+    root_path = workspace_root if workspace_root else os.getcwd()
     normalized_data = transform_paths(state_data, root_path, to_relative=True)
     
     with open(path, "w") as f:
         json.dump(normalized_data, f, indent=2)
-    logger.info(f"💾 State saved and normalized for [bold green]{project_id}[/]")
+    logger.info(f"💾 State saved and normalized to [bold blue]{path}[/]")
 
-def load_state(project_id):
+def load_state(project_id, workspace_root=None):
     """Loads previous reasoning state and expands relative paths."""
-    path = f"knowledge_base/states/{project_id}.json"
+    base_dir = workspace_root if workspace_root else "."
+    path = os.path.join(base_dir, ".mcp", "knowledge_base", f"{project_id}.json")
     if os.path.exists(path):
         with open(path, "r") as f:
             data = json.load(f)
             # Expand paths after loading
-            root_path = os.getcwd()
+            root_path = workspace_root if workspace_root else os.getcwd()
             return transform_paths(data, root_path, to_relative=False)
     return {}
 
-def run_rlm(prompt, model_name, base_url, environment="local", project_id=None):
+def run_rlm(prompt, model_name, base_url, environment="local", project_id=None, workspace_root=None):
     """
     Connects to a local Ollama server and runs RLM completion with persistence.
     """
     try:
         logger.info(f"🚀 Initializing RLM [bold cyan]{model_name}[/] | Project: {project_id}")
         
-        # Load previous knowledge if project_id is provided
-        previous_knowledge = load_state(project_id) if project_id else {}
+        # Load previous knowledge
+        previous_knowledge = load_state(project_id, workspace_root) if project_id else {}
         
         # Build an enhanced prompt that includes previous reasoning
         enhanced_prompt = prompt
@@ -102,11 +104,11 @@ def run_rlm(prompt, model_name, base_url, environment="local", project_id=None):
             try:
                 new_facts = json.loads(distill_res.response)
                 previous_knowledge.update(new_facts)
-                save_state(project_id, previous_knowledge)
+                save_state(project_id, previous_knowledge, workspace_root)
             except:
                 logger.warning("⚠️ Failed to parse distilled facts as JSON, saving raw response.")
                 previous_knowledge["latest_update"] = result.response
-                save_state(project_id, previous_knowledge)
+                save_state(project_id, previous_knowledge, workspace_root)
 
         logger.info("✅ [bold blue]Completion finished![/]")
         return {
@@ -135,16 +137,25 @@ if __name__ == "__main__":
         input_data = json.loads(input_raw)
         
         prompt = input_data.get("prompt")
-        model_name = input_data.get("model_name", "deepseek-r1:7b")
+        model_name = input_data.get("model_name", "llama3.2:3b") # Default to lighter model
         base_url = input_data.get("base_url", "http://localhost:11434/v1")
         env = input_data.get("environment", "local")
-        project_id = input_data.get("project_id") # New parameter for persistence
+        project_id = input_data.get("project_id")
+        workspace_root = input_data.get("workspace_root") # New parameter
+
+        # We wrap the RLM call in a 120s timeout to prevent zombie runs
+        import signal
+        def handler(signum, frame):
+            raise TimeoutError("RLM completion timed out after 120 seconds")
+        signal.signal(signal.SIGALRM, handler)
+        signal.alarm(120)
 
         if not prompt:
             print(json.dumps({"status": "error", "message": "No prompt provided"}))
             sys.exit(1)
 
-        result = run_rlm(prompt, model_name, base_url, env, project_id)
+        result = run_rlm(prompt, model_name, base_url, env, project_id, workspace_root)
+        signal.alarm(0) # Cancel alarm
         print(json.dumps(result))
 
     except Exception as e:

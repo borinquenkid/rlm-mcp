@@ -23,7 +23,44 @@ use std::process::{Command, Stdio};
 use std::io::Write;
 use std::sync::Arc;
 
-pub struct RlmHandler;
+#[derive(Debug, serde::Deserialize)]
+struct SubServerConfig {
+    command: String,
+    args: Vec<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct RlmConfig {
+    sub_servers: std::collections::HashMap<String, SubServerConfig>,
+}
+
+pub struct SubMcpOrchestrator {
+    config: RlmConfig,
+}
+
+impl SubMcpOrchestrator {
+    pub fn load(workspace_root: &Path) -> Option<Self> {
+        let config_path = workspace_root.join(".mcp").join("rlm_config.json");
+        if config_path.exists() {
+            let content = std::fs::read_to_string(config_path).ok()?;
+            let config: RlmConfig = serde_json::from_str(&content).ok()?;
+            return Some(Self { config });
+        }
+        None
+    }
+
+    pub fn start_sub_servers(&self) {
+        for (name, sub) in &self.config.sub_servers {
+            println!("🚀 Starting sub-server: {} ({} {})", name, sub.command, sub.args.join(" "));
+            // In a full implementation, we would use rust-mcp-sdk's client here
+            // to connect and discover tools. For now, we log the intent.
+        }
+    }
+}
+
+pub struct RlmHandler {
+    workspace_root: PathBuf,
+}
 
 #[async_trait]
 impl ServerHandler for RlmHandler {
@@ -45,8 +82,8 @@ impl ServerHandler for RlmHandler {
                 },
                 "model_name": {
                     "type": "string",
-                    "description": "The name of the local model to use (default: deepseek-r1:7b).",
-                    "default": "deepseek-r1:7b"
+                    "description": "The name of the local model to use (default: llama3.2:3b).",
+                    "default": "llama3.2:3b"
                 },
                 "environment": {
                     "type": "string",
@@ -138,8 +175,6 @@ impl ServerHandler for RlmHandler {
             let path = args.get("path").and_then(|v| v.as_str()).ok_or_else(|| CallToolError::new(RpcError::invalid_params()))?;
             let project_id = args.get("project_id").and_then(|v| v.as_str()).ok_or_else(|| CallToolError::new(RpcError::invalid_params()))?;
             
-            // 1. Calculate diffs (simple version: list files)
-            // In a real production tool, we'd use the sha2 crate here to compare hashes.
             // For now, we'll prompt RLM to perform the scan.
             let sync_prompt = format!(
                 "Scan the repository at {} and update your consolidated knowledge base for project '{}'. 
@@ -147,8 +182,8 @@ impl ServerHandler for RlmHandler {
                 path, project_id
             );
 
-            // 2. Call completion with the sync prompt
-            return self.call_bridge(&sync_prompt, "deepseek-r1:7b", "local", Some(project_id)).await;
+            // Use the lighter model for the sync scan
+            return self.call_bridge(&sync_prompt, "llama3.2:3b", "local", Some(project_id)).await;
         }
 
         if params.name != "rlm_completion" {
@@ -158,7 +193,7 @@ impl ServerHandler for RlmHandler {
         let args = params.arguments.unwrap_or_default();
         let prompt = args.get("prompt").and_then(|v| v.as_str()).ok_or_else(|| CallToolError::new(RpcError::invalid_params()))?;
         let project_id = args.get("project_id").and_then(|v| v.as_str());
-        let model_name = args.get("model_name").and_then(|v| v.as_str()).unwrap_or("deepseek-r1:7b");
+        let model_name = args.get("model_name").and_then(|v| v.as_str()).unwrap_or("llama3.2:3b");
         let environment = args.get("environment").and_then(|v| v.as_str()).unwrap_or("local");
 
         self.call_bridge(prompt, model_name, environment, project_id).await
@@ -183,7 +218,8 @@ impl RlmHandler {
             "model_name": model_name,
             "base_url": "http://localhost:11434/v1",
             "environment": environment,
-            "project_id": project_id
+            "project_id": project_id,
+            "workspace_root": self.workspace_root
         });
 
         if let Some(mut stdin) = child.stdin.take() {
@@ -215,9 +251,35 @@ impl RlmHandler {
     }
 }
 
+use std::path::{Path, PathBuf};
+
+fn find_workspace_root() -> Option<PathBuf> {
+    let mut curr = std::env::current_dir().ok()?;
+    loop {
+        if curr.join(".mcp").is_dir() || curr.join(".rlm").is_dir() {
+            return Some(curr);
+        }
+        if !curr.pop() {
+            break;
+        }
+    }
+    None
+}
+
 #[tokio::main]
 async fn main() -> SdkResult<()> {
     println!("Initializing rlm-mcp...");
+    
+    let workspace_root = find_workspace_root().unwrap_or_else(|| {
+        println!("No .mcp workspace found, using current directory.");
+        std::env::current_dir().unwrap()
+    });
+    println!("Workspace root: {:?}", workspace_root);
+
+    // 0. Load Sub-MCPs (Inception)
+    if let Some(orchestrator) = SubMcpOrchestrator::load(&workspace_root) {
+        orchestrator.start_sub_servers();
+    }
 
     // 1. Detect Hardware & OS
     let detector = SystemDetector::new();
@@ -260,7 +322,7 @@ async fn main() -> SdkResult<()> {
     };
 
     let transport = StdioTransport::new(TransportOptions::default())?;
-    let handler = RlmHandler {};
+    let handler = RlmHandler { workspace_root };
 
     let server: Arc<ServerRuntime> = server_runtime::create_server(McpServerOptions {
         server_details,

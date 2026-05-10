@@ -11,6 +11,10 @@ mod tests {
 }
 
 use std::process::Command;
+use std::fs;
+
+const BRIDGE_CODE: &str = include_str!("../rlm_bridge.py");
+const PYPROJECT_CODE: &str = include_str!("../pyproject.toml");
 
 pub struct PythonManager {}
 
@@ -27,6 +31,10 @@ impl PythonManager {
     }
 
     pub fn ensure_ready(&self) -> Result<(), String> {
+        // Ensure bridge and pyproject exist locally
+        fs::write("rlm_bridge.py", BRIDGE_CODE).map_err(|e| format!("Failed to write bridge: {}", e))?;
+        fs::write("pyproject.toml", PYPROJECT_CODE).map_err(|e| format!("Failed to write pyproject: {}", e))?;
+
         if !self.is_uv_installed() {
             println!("uv not found. Attempting to install...");
             self.install_uv()?;

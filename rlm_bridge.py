@@ -3,39 +3,56 @@ import json
 import os
 import logging
 from rlm import RLM
+from rich.console import Console
+from rich.logging import RichHandler
 
-# Configure logging to stderr so it doesn't interfere with JSON stdout
-logging.basicConfig(level=logging.INFO, stream=sys.stderr, format='%(levelname)s: %(message)s')
+# Use rich console for stderr feedback
+console = Console(stderr=True)
+
+# Configure logging to use RichHandler on stderr with DEBUG level
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(message)s",
+    datefmt="[%X]",
+    handlers=[RichHandler(console=console, rich_tracebacks=True)]
+)
 logger = logging.getLogger("rlm_bridge")
+logger.setLevel(logging.DEBUG)
 
 def run_rlm(prompt, model_name, base_url, environment="local"):
     """
     Connects to a local Ollama (or OpenAI-compatible) server and runs RLM completion.
     """
     try:
-        logger.info(f"Initializing RLM with model={model_name}, url={base_url}")
+        logger.info(f"🚀 Initializing RLM [bold cyan]{model_name}[/] at [underline]{base_url}[/]")
         
         # Initialize RLM
+        # Note: we use environment="local" by default for code execution
+        # Initialize RLM
         rlm = RLM(
-            backend="openai", # Ollama is OpenAI-compatible
+            backend="openai",
             backend_kwargs={
                 "model_name": model_name,
                 "base_url": base_url,
-                "api_key": "ollama" # Dummy key for Ollama
+                "api_key": "ollama",
+                "stream": True # Enable streaming for better feedback
             },
             environment=environment
         )
 
-        logger.info("Starting RLM completion...")
+        logger.info("🧠 [bold green]Starting recursive reasoning...[/]")
+        
+        # Use rlm.completion which internally logs to rich if configured
         result = rlm.completion(prompt)
 
+        logger.info("✅ [bold blue]Completion finished![/]")
         return {
             "status": "success",
             "response": result.response,
             "trajectory_log": getattr(result, "log_file", None)
         }
     except Exception as e:
-        logger.error(f"RLM Error: {str(e)}")
+        logger.error(f"❌ [bold red]RLM Error:[/] {str(e)}")
         return {
             "status": "error",
             "message": str(e)
@@ -44,11 +61,14 @@ def run_rlm(prompt, model_name, base_url, environment="local"):
 if __name__ == "__main__":
     try:
         # Read input from stdin
+        logger.info("Bridge waiting for input...")
         input_raw = sys.stdin.read()
+            
         if not input_raw:
             logger.error("No input received on stdin")
             sys.exit(1)
             
+        logger.info(f"Received input length: {len(input_raw)}")
         input_data = json.loads(input_raw)
         
         prompt = input_data.get("prompt")

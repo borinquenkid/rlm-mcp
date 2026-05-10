@@ -39,13 +39,8 @@ def transform_paths(obj, root_path, to_relative=True):
 
 import yaml
 
-APACHE_HEADER = """# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements; and to You under the Apache License, Version 2.0.
-# --- RLM Generated Knowledge Base ---
-"""
-
 def save_state(project_id, state_data, workspace_root=None):
-    """Saves the distilled reasoning state to disk as YAML with Apache header."""
+    """Saves the distilled reasoning state to disk as YAML."""
     base_dir = workspace_root if workspace_root else "."
     path = os.path.join(base_dir, ".mcp", "knowledge_base", f"{project_id}.yaml")
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -54,9 +49,8 @@ def save_state(project_id, state_data, workspace_root=None):
     normalized_data = transform_paths(state_data, root_path, to_relative=True)
     
     with open(path, "w") as f:
-        f.write(APACHE_HEADER)
         yaml.dump(normalized_data, f, sort_keys=False, default_flow_style=False)
-    logger.info(f"💾 State saved and normalized to [bold blue]{path}[/]")
+    logger.info(f"💾 State saved to [bold blue]{path}[/]")
 
 def load_state(project_id, workspace_root=None):
     """Loads previous reasoning state from YAML and expands relative paths."""

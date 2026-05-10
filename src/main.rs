@@ -50,19 +50,36 @@ impl SubMcpOrchestrator {
     }
 
     pub fn start_sub_servers(&self, workspace_root: &Path) {
-        let project_name = workspace_root.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown-project");
+        // Get the repo name from git, fallback to folder name
+        let project_name = Command::new("git")
+            .arg("-C")
+            .arg(workspace_root)
+            .arg("rev-parse")
+            .arg("--show-toplevel")
+            .output()
+            .ok()
+            .and_then(|out| {
+                let path = String::from_utf8(out.stdout).ok()?;
+                Path::new(path.trim()).file_name()?.to_str().map(|s| s.to_string())
+            })
+            .unwrap_or_else(|| {
+                workspace_root.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown-project")
+                    .to_string()
+            });
 
+        let home_dir = std::env::var("HOME").unwrap_or_else(|_| "~".to_string());
+        
         for (name, sub) in &self.config.sub_servers {
             let args: Vec<String> = sub.args.iter()
-                .map(|a| a.replace("$PROJECT_NAME", project_name))
+                .map(|a| a.replace("$PROJECT_NAME", &project_name).replace("$HOME", &home_dir))
                 .collect();
+            let command = sub.command.replace("$HOME", &home_dir);
 
-            println!("🚀 Starting sub-server: {} ({} {:?})", name, sub.command, args);
+            println!("🚀 Starting sub-server: {} ({} {:?})", name, command, args);
 
-            // Spawn the child MCP server as a subprocess
-            let mut _child = Command::new(&sub.command)
+            let mut _child = Command::new(command)
                 .args(&args)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())

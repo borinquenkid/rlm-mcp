@@ -133,6 +133,19 @@ impl ServerHandler for RlmHandler {
                 output_schema: None,
                 title: Some("Sync Codebase".to_string()),
             }, Tool {
+                name: "self_update".to_string(),
+                description: Some("Update rlm-mcp to the latest version from GitHub.".to_string()),
+                input_schema: serde_json::from_value(json!({
+                    "type": "object",
+                    "properties": {}
+                })).unwrap(),
+                annotations: None,
+                execution: None,
+                icons: vec![],
+                meta: None,
+                output_schema: None,
+                title: Some("Self Update".to_string()),
+            }, Tool {
                 name: "system_status".to_string(),
                 description: Some("Check the current hardware and system status.".to_string()),
                 input_schema: serde_json::from_value(json!({
@@ -154,6 +167,29 @@ impl ServerHandler for RlmHandler {
         params: CallToolRequestParams,
         _runtime: Arc<dyn McpServer>,
     ) -> Result<CallToolResult, CallToolError> {
+        if params.name == "self_update" {
+            let status = Command::new("cargo")
+                .arg("install")
+                .arg("--git")
+                .arg("https://github.com/borinquenkid/rlm-mcp")
+                .arg("--force")
+                .status()
+                .map_err(|e| CallToolError::new(RpcError::internal_error().with_message(format!("Update failed: {}", e))))?;
+            
+            let message = if status.success() {
+                "Successfully updated to the latest version. Please restart the server."
+            } else {
+                "Update failed. Please check your internet connection and permissions."
+            };
+            
+            return Ok(CallToolResult {
+                content: vec![ContentBlock::TextContent(TextContent::new(message.to_string(), None, None))],
+                is_error: None,
+                meta: None,
+                structured_content: None,
+            });
+        }
+
         if params.name == "system_status" {
             let detector = SystemDetector::new();
             let status_text = format!(

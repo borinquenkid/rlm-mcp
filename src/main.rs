@@ -48,21 +48,33 @@ impl SubMcpOrchestrator {
         }
         None
     pub fn start_sub_servers(&self, workspace_root: &Path) {
-        let project_name = workspace_root.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown-project");
+        pub fn start_sub_servers(&self, workspace_root: &Path) {
+            let project_name = workspace_root.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown-project");
 
-        for (name, sub) in &self.config.sub_servers {
-            let args: Vec<String> = sub.args.iter()
-                .map(|a| a.replace("$PROJECT_NAME", project_name))
-                .collect();
+            for (name, sub) in &self.config.sub_servers {
+                let args: Vec<String> = sub.args.iter()
+                    .map(|a| a.replace("$PROJECT_NAME", project_name))
+                    .collect();
 
-            println!("🚀 Starting sub-server: {} ({} {})", name, sub.command, args.join(" "));
+                println!("🚀 Starting sub-server: {} ({} {:?})", name, sub.command, args);
+
+                // Spawn the child MCP server as a subprocess
+                let mut child = Command::new(&sub.command)
+                    .args(&args)
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::inherit())
+                    .spawn()
+                    .expect("Failed to spawn sub-server");
+
+                // We would now use child.stdin/stdout with the rust-mcp-sdk client API
+                // to call tools and discover capabilities dynamically.
+                println!("✅ Sub-server {} initialized.", name);
+            }
         }
-    }
 
-            // In a full implementation, we would use rust-mcp-sdk's client here
-            // to connect and discover tools. For now, we log the intent.
         }
     }
 }

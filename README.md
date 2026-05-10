@@ -8,17 +8,20 @@
 - **Workspace-Aware:** Automatically discovers project configurations in `.mcp/` or `.rlm/` folders.
 - **Recursive Reasoning:** Uses multi-step LLM loops to trace complex class hierarchies and architectural patterns.
 
-## Quick Start
-1. Ensure you have [Ollama](https://ollama.com/) installed and running.
-2. Clone the repository and run:
-   ```bash
-   cargo run
-   ```
-3. The server will automatically:
-    - Detect your OS and hardware.
-    - Provision a hermetic Python environment using `uv`.
-    - Pull the recommended `deepseek-r1:7b` model.
-    - Launch the MCP server on stdio.
+## Installation
+
+### For Developers (via Cargo)
+If you have [Rust](https://rustup.rs/) installed:
+```bash
+cargo install --git https://github.com/borinquenkid/rlm-mcp
+```
+
+### For Users (Pre-compiled Binaries)
+1. Download the latest binary for your OS from the [Releases page](https://github.com/borinquenkid/rlm-mcp/releases).
+2. Rename the file to `rlm-mcp` and move it to your `/usr/local/bin` (or equivalent).
+3. Ensure the binary is executable: `chmod +x rlm-mcp`.
+
+*Note: The first time you run `rlm-mcp`, it will automatically provision your local Python environment, pull the necessary reasoning models (approx. 5GB), and configure the background services.*
 
 ## Project Structure
 - `.mcp/`: Configuration and project-specific knowledge base.

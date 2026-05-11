@@ -6,8 +6,6 @@ mod tests {
     fn test_platform_detection() {
         let detector = SystemDetector::new();
         let platform = detector.platform();
-        
-        // Assert that we detect one of the supported platforms
         assert!(
             platform == "macos" || platform == "linux" || platform == "windows",
             "Unsupported platform: {}", platform
@@ -18,8 +16,6 @@ mod tests {
     fn test_arch_detection() {
         let detector = SystemDetector::new();
         let arch = detector.arch();
-        
-        // Assert that we detect one of the supported architectures
         assert!(
             arch == "aarch64" || arch == "x86_64",
             "Unsupported architecture: {}", arch
@@ -30,13 +26,18 @@ mod tests {
     fn test_memory_detection() {
         let detector = SystemDetector::new();
         let total_memory_gb = detector.total_memory_gb();
-        
-        // Most modern dev machines have at least 4GB
         assert!(total_memory_gb >= 4.0, "Detected unusually low memory: {}GB", total_memory_gb);
+    }
+
+    #[test]
+    fn test_worktree_detection() {
+        let detector = SystemDetector::new();
+        assert!(!detector.is_inside_worktree(), "Should not be in a worktree by default");
     }
 }
 
-use sysinfo::{System};
+use sysinfo::System;
+use std::process::Command;
 
 pub struct SystemDetector {
     sys: System,
@@ -71,5 +72,14 @@ impl SystemDetector {
 
     pub fn total_memory_gb(&self) -> f64 {
         self.sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0
+    }
+
+    pub fn is_inside_worktree(&self) -> bool {
+        Command::new("git")
+            .arg("rev-parse")
+            .arg("--is-inside-work-tree")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim() == "true")
+            .unwrap_or(false)
     }
 }

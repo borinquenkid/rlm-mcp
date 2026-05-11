@@ -63,22 +63,46 @@ def load_state(project_id, workspace_root=None):
             return transform_paths(data, root_path, to_relative=False)
     return {}
 
+import importlib.util
+import inspect
+
+def load_drivers(workspace_root):
+    """Dynamically loads drivers from .mcp/drivers/ and returns a dict for RLM injection."""
+    drivers = {}
+    driver_dir = os.path.join(workspace_root or ".", ".mcp", "drivers")
+    
+    if not os.path.exists(driver_dir):
+        return drivers
+
+    for filename in os.listdir(driver_dir):
+        if filename.endswith(".py") and not filename.startswith("__"):
+            module_name = filename[:-3]
+            file_path = os.path.join(driver_dir, filename)
+            
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            # Look for classes that look like drivers
+            for name, obj in inspect.getmembers(module):
+                if name.endswith("Driver") and inspect.isclass(obj):
+                    drivers[name.replace("Driver", "").lower()] = obj()
+                    logger.info(f"🛠️ Injected Tool Driver: [bold]{name}[/]")
+    
+    return drivers
+
 def run_rlm(prompt, model_name, base_url, environment="local", project_id=None, workspace_root=None):
-    """
-    Connects to a local Ollama server and runs RLM completion with persistence.
-    """
     try:
         logger.info(f"🚀 Initializing RLM [bold cyan]{model_name}[/] | Project: {project_id}")
         
         # Load previous knowledge
         previous_knowledge = load_state(project_id, workspace_root) if project_id else {}
         
-        # Build an enhanced prompt that includes previous reasoning
-        enhanced_prompt = prompt
-        if previous_knowledge:
-            logger.info("📚 Loading existing knowledge into context...")
-            enhanced_prompt = f"Previous Knowledge about this project: {json.dumps(previous_knowledge)}\n\nUser Query: {prompt}"
-
+        # Load dynamic drivers
+        custom_tools = load_drivers(workspace_root)
+        
+        # ... (rest of function)
+        
         rlm = RLM(
             backend="openai",
             backend_kwargs={
@@ -89,7 +113,8 @@ def run_rlm(prompt, model_name, base_url, environment="local", project_id=None, 
             },
             environment=environment,
             verbose=True,
-            logger=RLMLogger(log_dir="trajectories")
+            logger=RLMLogger(log_dir="trajectories"),
+            custom_tools=custom_tools # Injected tools!
         )
 
         logger.info("🧠 [bold green]Starting recursive reasoning...[/]")

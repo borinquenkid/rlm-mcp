@@ -23,11 +23,12 @@ The system is a fully autonomous orchestrator.
 ### Phase 7: Sub-MCP Integration (Core)
 - [ ] **Task 7.1: Hybrid Server/Client Orchestration**
     - Update `src/main.rs` to maintain active `Client` connections to Sub-MCPs.
-    - Implement tool-routing to map `codebase:*` requests to the child MCP.
+    - Implement tool-routing to map `repowise:*` (or other sub-MCP) requests to the child MCP.
 - [ ] **Task 7.2: Discovery & Injection**
-    - Automatically fetch tools from `codebase-memory` and inject into RLM bridge.
+    - Automatically fetch tools from context providers like **Repowise** and inject into RLM bridge.
+    - *Note: Repowise is highly recommended over basic codebase-memory tools due to its token efficiency, Git intelligence, and ADR tracking, making it the ideal "data provider" for RLM's reasoning engine.*
 - [ ] **Task 7.3: Proxy & Distill**
-    - Proxy graph queries and distill the results using the lightweight reasoning engine.
+    - Proxy graph/context queries and distill the results using the lightweight reasoning engine.
 
 ## Technical Debt & Considerations
 - **Memory Pressure:** The current model footprint (7B) is tuned for 16GB total RAM machines.
